@@ -69,6 +69,10 @@ if [ ! -f "backiietui_linux_amd64" ]; then
 fi
 
 echo "[4/7] Moviendo binarios a /usr/local/bin..."
+if systemctl is-active --quiet backiie.service; then
+    echo "Deteniendo el servicio actual para poder actualizar el binario..."
+    systemctl stop backiie.service
+fi
 cp backiietui_linux_amd64 /usr/local/bin/backiietui_bin
 chmod +x /usr/local/bin/backiietui_bin
 
