@@ -11,11 +11,14 @@ echo "=========================================="
 echo " Instalador de BackiieTUI para Linux"
 echo "=========================================="
 
-echo "[1/5] Compilando el binario..."
-(cd .. && go build -o installer/backiietui ./cmd/main.go ./cmd/recover.go)
+echo "[1/5] Verificando binario precompilado..."
+if [ ! -f "backiietui_linux_amd64" ]; then
+  echo "Error: No se encontro el binario 'backiietui_linux_amd64' en este directorio."
+  exit 1
+fi
 
 echo "[2/5] Moviendo binarios a /usr/local/bin..."
-mv backiietui /usr/local/bin/backiietui_bin
+cp backiietui_linux_amd64 /usr/local/bin/backiietui_bin
 chmod +x /usr/local/bin/backiietui_bin
 
 echo "[3/5] Creando wrapper inteligente 'backiie'..."
