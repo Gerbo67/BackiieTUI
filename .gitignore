@@ -1,0 +1,49 @@
+# Binaries
+backiietui
+backiietui.exe
+backiietui_bin
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with go test -c
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Databases & Logs
+*.db
+*.db-lock
+*.log
+log.txt
+*.sql.gz
+*.bak
+
+# Environment / Secret Files
+.env
+.env.local
+.env.*
+
+# AI / IDE / Editor folders (DO NOT TRACK)
+.gemini/
+.cursor/
+.cursorrules
+.vscode/
+.idea/
+.fleet/
+scratch/
+graphify-out/
+.aider*
+.claude*
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
