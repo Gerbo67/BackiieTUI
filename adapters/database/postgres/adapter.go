@@ -85,6 +85,8 @@ func (a *Adapter) Backup(ctx context.Context, database string) (io.ReadCloser, p
 		"--no-password",
 		"--compress=9",
 		"--format=plain",
+		"--no-owner",
+		"--no-privileges",
 	)
 	pgDump.Env = append(os.Environ(), "PGPASSWORD="+a.instance.Password)
 
