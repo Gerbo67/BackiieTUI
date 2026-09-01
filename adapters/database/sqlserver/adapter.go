@@ -153,7 +153,7 @@ func (a *Adapter) objectKey(database, ext string) string {
 // Backup streams a full backup by saving it to the container's disk and reading it via docker exec.
 func (a *Adapter) Backup(ctx context.Context, database string) (io.ReadCloser, ports.BackupMeta, error) {
 	return a.backup(ctx, database, "bak", func(path string) string {
-		return fmt.Sprintf(`BACKUP DATABASE [%s] TO DISK = '%s' WITH INIT, COMPRESSION, STATS = 25, CHECKSUM`, database, path)
+		return fmt.Sprintf(`BACKUP DATABASE [%s] TO DISK = '%s' WITH INIT`, database, path)
 	})
 }
 
@@ -167,7 +167,7 @@ func (a *Adapter) BackupLog(ctx context.Context, database string) (io.ReadCloser
 		return nil, ports.BackupMeta{}, ports.ErrLogBackupNotApplicable
 	}
 	return a.backup(ctx, database, "trn", func(path string) string {
-		return fmt.Sprintf(`BACKUP LOG [%s] TO DISK = '%s' WITH INIT, COMPRESSION, STATS = 25, CHECKSUM`, database, path)
+		return fmt.Sprintf(`BACKUP LOG [%s] TO DISK = '%s' WITH INIT`, database, path)
 	})
 }
 
