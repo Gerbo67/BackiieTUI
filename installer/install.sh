@@ -11,7 +11,7 @@ echo "=========================================="
 echo " Instalador de BackiieTUI para Linux"
 echo "=========================================="
 
-echo "[1/6] Verificando dependencias de bases de datos (PostgreSQL Client)..."
+echo "[1/7] Verificando dependencias de bases de datos (PostgreSQL Client)..."
 if ! command -v pg_dump &> /dev/null; then
     echo "=========================================="
     echo " No se detectó 'pg_dump' en el sistema."
@@ -42,17 +42,37 @@ else
     echo "PostgreSQL client (pg_dump) ya está instalado. Omitiendo..."
 fi
 
-echo "[2/6] Verificando binario precompilado..."
+echo "[2/7] Verificando dependencias de bases de datos (MySQL/MariaDB Client)..."
+if ! command -v mysqldump &> /dev/null; then
+    echo "=========================================="
+    echo " No se detectó 'mysqldump' en el sistema."
+    echo " BackiieTUI lo requiere para respaldar MySQL o MariaDB."
+    echo " ¿Deseas instalar el cliente estándar de MySQL/MariaDB?"
+    echo " 1) Sí (Recomendado, instala default-mysql-client)"
+    echo " 2) Saltar (Lo instalaré manualmente o no uso MySQL)"
+    read -p "Selecciona una opción [1-2]: " mysql_opt
+
+    if [ "$mysql_opt" == "1" ]; then
+        echo "Instalando default-mysql-client..."
+        apt-get update && apt-get install -y default-mysql-client || apt-get install -y mariadb-client
+    else
+        echo "Saltando instalación de MySQL Client."
+    fi
+else
+    echo "MySQL client (mysqldump) ya está instalado. Omitiendo..."
+fi
+
+echo "[3/7] Verificando binario precompilado..."
 if [ ! -f "backiietui_linux_amd64" ]; then
   echo "Error: No se encontro el binario 'backiietui_linux_amd64' en este directorio."
   exit 1
 fi
 
-echo "[3/6] Moviendo binarios a /usr/local/bin..."
+echo "[4/7] Moviendo binarios a /usr/local/bin..."
 cp backiietui_linux_amd64 /usr/local/bin/backiietui_bin
 chmod +x /usr/local/bin/backiietui_bin
 
-echo "[4/6] Creando wrapper inteligente 'backiie'..."
+echo "[5/7] Creando wrapper inteligente 'backiie'..."
 # Como la base de datos bbolt solo permite un proceso a la vez, 
 # el wrapper detiene el servicio en segundo plano mientras usas la interfaz,
 # y lo vuelve a arrancar automaticamente cuando la cierras.
@@ -71,11 +91,11 @@ sudo systemctl start backiie.service
 EOF
 chmod +x /usr/local/bin/backiie
 
-echo "[5/6] Creando directorio para la base de datos..."
+echo "[6/7] Creando directorio para la base de datos..."
 mkdir -p /var/lib/backiie
 chmod 777 /var/lib/backiie
 
-echo "[6/6] Configurando el servicio de Systemd (Demonio de respaldos)..."
+echo "[7/7] Configurando el servicio de Systemd (Demonio de respaldos)..."
 cat << 'EOF' > /etc/systemd/system/backiie.service
 [Unit]
 Description=Backiie Scheduler Daemon
