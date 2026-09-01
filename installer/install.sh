@@ -11,17 +11,48 @@ echo "=========================================="
 echo " Instalador de BackiieTUI para Linux"
 echo "=========================================="
 
-echo "[1/5] Verificando binario precompilado..."
+echo "[1/6] Verificando dependencias de bases de datos (PostgreSQL Client)..."
+if ! command -v pg_dump &> /dev/null; then
+    echo "=========================================="
+    echo " No se detectó 'pg_dump' en el sistema."
+    echo " BackiieTUI lo requiere para respaldar PostgreSQL."
+    echo " ¿Qué versión de PostgreSQL Client deseas instalar?"
+    echo " (Debe ser IGUAL o MAYOR a la versión de tu servidor)"
+    echo " 1) Versión 17 (Estándar de Linux / Rápida)"
+    echo " 2) Versión 18 (Desde el repositorio oficial de Postgres)"
+    echo " 3) Saltar (Lo instalaré manualmente o usaré Docker)"
+    read -p "Selecciona una opción [1-3]: " pg_opt
+
+    if [ "$pg_opt" == "1" ]; then
+        echo "Instalando postgresql-client (v17)..."
+        apt-get update && apt-get install -y postgresql-client
+    elif [ "$pg_opt" == "2" ]; then
+        echo "Instalando postgresql-client-18 desde repositorio oficial..."
+        apt-get update
+        apt-get install -y curl ca-certificates lsb-release
+        install -d /usr/share/postgresql-common/pgdg
+        curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        apt-get update
+        apt-get install -y postgresql-client-18
+    else
+        echo "Saltando instalación de PostgreSQL Client."
+    fi
+else
+    echo "PostgreSQL client (pg_dump) ya está instalado. Omitiendo..."
+fi
+
+echo "[2/6] Verificando binario precompilado..."
 if [ ! -f "backiietui_linux_amd64" ]; then
   echo "Error: No se encontro el binario 'backiietui_linux_amd64' en este directorio."
   exit 1
 fi
 
-echo "[2/5] Moviendo binarios a /usr/local/bin..."
+echo "[3/6] Moviendo binarios a /usr/local/bin..."
 cp backiietui_linux_amd64 /usr/local/bin/backiietui_bin
 chmod +x /usr/local/bin/backiietui_bin
 
-echo "[3/5] Creando wrapper inteligente 'backiie'..."
+echo "[4/6] Creando wrapper inteligente 'backiie'..."
 # Como la base de datos bbolt solo permite un proceso a la vez, 
 # el wrapper detiene el servicio en segundo plano mientras usas la interfaz,
 # y lo vuelve a arrancar automaticamente cuando la cierras.
@@ -40,11 +71,11 @@ sudo systemctl start backiie.service
 EOF
 chmod +x /usr/local/bin/backiie
 
-echo "[4/5] Creando directorio para la base de datos..."
+echo "[5/6] Creando directorio para la base de datos..."
 mkdir -p /var/lib/backiie
 chmod 777 /var/lib/backiie
 
-echo "[5/5] Configurando el servicio de Systemd (Demonio de respaldos)..."
+echo "[6/6] Configurando el servicio de Systemd (Demonio de respaldos)..."
 cat << 'EOF' > /etc/systemd/system/backiie.service
 [Unit]
 Description=Backiie Scheduler Daemon

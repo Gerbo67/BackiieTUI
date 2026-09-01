@@ -97,29 +97,52 @@ func (uc *RestoreUseCase) RestoreBackup(ctx context.Context, backupID, targetIns
 	var chainIDs []string
 	var restoreErr error
 
+	var chain []*entities.BackupRecord
 	if target.Engine == entities.EngineSQLServer {
-		var chain []*entities.BackupRecord
 		chain, restoreErr = uc.buildChain(ctx, rec)
-		if restoreErr == nil {
-			for _, c := range chain {
-				chainIDs = append(chainIDs, c.ID)
-			}
-			restoreErr = uc.applyChain(ctx, chain, dbAdapter, targetDatabase, s3cfg)
-		}
 	} else {
-		// Non-SQL-Server engines don't chain — download the single backup file and restore it.
+		chain = []*entities.BackupRecord{rec}
+	}
+
+	if restoreErr == nil {
 		var storage ports.StorageAdapter
 		storage, restoreErr = uc.storageFactory.NewStorage(s3cfg)
 		if restoreErr == nil {
-			var reader io.ReadCloser
-			reader, restoreErr = storage.Download(ctx, rec.FileName)
-			if restoreErr == nil {
-				defer reader.Close()
-				restoreErr = dbAdapter.Restore(ctx, targetDatabase, reader, ports.RestoreOptions{
-					SourceKey: rec.FileName,
-					S3Config:  s3cfg,
-				})
-				chainIDs = []string{rec.ID}
+			for i, c := range chain {
+				chainIDs = append(chainIDs, c.ID)
+				
+				var reader io.ReadCloser
+				reader, restoreErr = storage.Download(ctx, c.FileName)
+				if restoreErr != nil {
+					break
+				}
+				
+				isLast := i == len(chain)-1
+				if i == 0 {
+					// Restaurar FULL
+					err := dbAdapter.Restore(ctx, targetDatabase, reader, ports.RestoreOptions{
+						NoRecovery: !isLast && target.Engine == entities.EngineSQLServer,
+					})
+					reader.Close()
+					if err != nil {
+						restoreErr = err
+						break
+					}
+				} else {
+					// Restaurar LOG
+					logAdapter, ok := dbAdapter.(ports.LogCapableAdapter)
+					if !ok {
+						reader.Close()
+						restoreErr = fmt.Errorf("el adaptador no soporta logs")
+						break
+					}
+					err := logAdapter.RestoreLog(ctx, targetDatabase, reader, isLast)
+					reader.Close()
+					if err != nil {
+						restoreErr = err
+						break
+					}
+				}
 			}
 		}
 	}
@@ -349,33 +372,7 @@ func (uc *RestoreUseCase) buildChain(ctx context.Context, target *entities.Backu
 	return append([]*entities.BackupRecord{full}, logs...), nil
 }
 
-// applyChain restores the full (WITH NORECOVERY if logs follow) and then each log in order,
-// marking only the last one WITH RECOVERY.
-func (uc *RestoreUseCase) applyChain(ctx context.Context, chain []*entities.BackupRecord, dbAdapter ports.DatabaseAdapter, targetDatabase string, s3cfg *entities.S3Config) error {
-	full := chain[0]
-	if err := dbAdapter.Restore(ctx, targetDatabase, nil, ports.RestoreOptions{
-		SourceKey:  full.FileName,
-		S3Config:   s3cfg,
-		NoRecovery: len(chain) > 1,
-	}); err != nil {
-		return fmt.Errorf("restaurar full: %w", err)
-	}
-	if len(chain) == 1 {
-		return nil
-	}
 
-	logCapable, ok := dbAdapter.(ports.LogCapableAdapter)
-	if !ok {
-		return fmt.Errorf("el adaptador no soporta restaurar logs")
-	}
-	for i := 1; i < len(chain); i++ {
-		isLast := i == len(chain)-1
-		if err := logCapable.RestoreLog(ctx, targetDatabase, chain[i].FileName, s3cfg, isLast); err != nil {
-			return fmt.Errorf("restaurar log %s: %w", chain[i].ID, err)
-		}
-	}
-	return nil
-}
 
 func (uc *RestoreUseCase) startRestoreRecord(ctx context.Context, target *entities.Instance, targetDatabase, backupID string) *entities.RestoreRecord {
 	rec := &entities.RestoreRecord{

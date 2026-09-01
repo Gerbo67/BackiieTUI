@@ -243,42 +243,23 @@ func (uc *RunBackupUseCase) backupDatabase(
 
 	hr := hash.NewHashingReader(reader)
 
-	// For SQL Server, backup went directly to S3; skip upload
-	isSQLServerDirect := inst.Engine == entities.EngineSQLServer
-	var uploadedBytes int64
-
-	if !isSQLServerDirect {
-		uploadedBytes, err = storage.Upload(ctx, meta.SuggestedKey, hr)
-		if err != nil {
-			reader.Close()
-			_ = uc.backupRepo.UpdateStatus(ctx, record.ID, entities.StatusFailed, err.Error())
-			return err
-		}
-
-		// Verify the dump process exited successfully. For tools like pg_dump
-		// and mysqldump, a non-zero exit after uploading 0 bytes means the
-		// backup silently failed (auth error, empty output, etc.).
-		if closeErr := reader.Close(); closeErr != nil {
-			_ = storage.DeleteObject(ctx, meta.SuggestedKey) // remove empty/partial file
-			_ = uc.backupRepo.UpdateStatus(ctx, record.ID, entities.StatusFailed, closeErr.Error())
-			return closeErr
-		}
-
-		_ = storage.TagExpiry(ctx, meta.SuggestedKey, record.ExpiresAt)
-	} else {
-		defer reader.Close()
-		// Drain the reader (it's empty for SQL Server) to compute hash
-		buf := make([]byte, 4096)
-		for {
-			_, rerr := hr.Read(buf)
-			if rerr == io.EOF {
-				break
-			}
-			if rerr != nil {
-				break
-			}
-		}
+	uploadedBytes, err := storage.Upload(ctx, meta.SuggestedKey, hr)
+	if err != nil {
+		reader.Close()
+		_ = uc.backupRepo.UpdateStatus(ctx, record.ID, entities.StatusFailed, err.Error())
+		return err
 	}
+
+	// Verify the dump process exited successfully. For tools like pg_dump,
+	// mysqldump, and our docker exec sqlserver extraction, a non-zero exit
+	// after uploading 0 bytes means the backup silently failed.
+	if closeErr := reader.Close(); closeErr != nil {
+		_ = storage.DeleteObject(ctx, meta.SuggestedKey) // remove empty/partial file
+		_ = uc.backupRepo.UpdateStatus(ctx, record.ID, entities.StatusFailed, closeErr.Error())
+		return closeErr
+	}
+
+	_ = storage.TagExpiry(ctx, meta.SuggestedKey, record.ExpiresAt)
 
 	now := time.Now().UTC()
 	record.Status = entities.StatusCompleted

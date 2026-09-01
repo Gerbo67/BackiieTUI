@@ -58,7 +58,7 @@ type LogCapableAdapter interface {
 	BackupLog(ctx context.Context, database string) (io.ReadCloser, BackupMeta, error)
 	// RestoreLog applies a transaction log backup on top of a database left WITH NORECOVERY.
 	// recovery=true marks the last log in a chain, bringing the database back online.
-	RestoreLog(ctx context.Context, database string, sourceKey string, s3cfg *entities.S3Config, recovery bool) error
+	RestoreLog(ctx context.Context, database string, reader io.Reader, recovery bool) error
 }
 
 // StorageObject represents a file stored in S3.
